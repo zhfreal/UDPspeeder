@@ -319,7 +319,7 @@ int fec_encode_manager_t::input(char *s,int len/*,int &is_first_packet*/)
 
 		if(enable_worst_ratio && actual_redundant_num >actual_data_num*(worst_ratio-1))
 		{
-			assert(worst_ratio-1 > 0);
+			assert(worst_ratio-1 >= 0);
 			actual_redundant_num=actual_data_num*(worst_ratio-1) ;
 		}
 
