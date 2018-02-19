@@ -924,7 +924,7 @@ void process_arg(int argc, char *argv[])
 				sscanf(optarg,"%d",&worst_ratio);
 				if(worst_ratio<1||worst_ratio>10)
 				{
-					mylog(log_fatal,"fec_mtu should be between 1 and 10\n");
+					mylog(log_fatal,"worst_ratio should be between 1 and 10\n");
 					myexit(-1);
 				}
 			}
@@ -985,7 +985,7 @@ void process_arg(int argc, char *argv[])
 
 	if(g_fec_redundant_num> g_fec_data_num*worst_ratio)
 	{
-		mylog(log_warn,"worst_ratio(%d)  > redundant_num(%d)+data_num/ data_num(%d)  ,maybe there is a mistake.\n",worst_ratio,g_fec_redundant_num,g_fec_data_num);
+		mylog(log_warn,"worst_ratio(%d)  > ( redundant_num(%d)+data_num(%d) )/ data_num  ,maybe there is a mistake.\n",worst_ratio,g_fec_redundant_num,g_fec_data_num);
 	}
 
 	print_parameter();

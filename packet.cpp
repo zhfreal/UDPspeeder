@@ -324,13 +324,26 @@ int put_crc32(char * s,int &len)
 	write_u32(s+len,crc32);
 	len+=sizeof(u32_t);
 
+	return 0;
+}
 
+int rm_crc32(char * s,int &len)
+{
+
+	if(disable_checksum)return 0;
+
+	assert(len>=0);
+
+	len-=sizeof(u32_t);
+	if(len<0) return -1;
+	u32_t crc32_in=read_u32(s+len);
+	u32_t crc32=crc32h((unsigned char *)s,len);
+	if(crc32!=crc32_in) return -1;
 	return 0;
 }
 
 int do_cook(char * data,int &len)
 {
-	if(disable_checksum)return 0;
 
 	put_crc32(data,len);
 	if(!disable_obscure)do_obscure(data,len);
@@ -358,17 +371,7 @@ int de_cook(char * s,int &len)
 	}
 	return 0;
 }
-int rm_crc32(char * s,int &len)
-{
-	assert(len>=0);
 
-	len-=sizeof(u32_t);
-	if(len<0) return -1;
-	u32_t crc32_in=read_u32(s+len);
-	u32_t crc32=crc32h((unsigned char *)s,len);
-	if(crc32!=crc32_in) return -1;
-	return 0;
-}
 /*
 int do_obs()
 {

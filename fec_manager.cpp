@@ -317,9 +317,10 @@ int fec_encode_manager_t::input(char *s,int len/*,int &is_first_packet*/)
 
     	}
 
-		if(enable_worst_ratio && actual_redundant_num >actual_data_num*worst_ratio)
+		if(enable_worst_ratio && actual_redundant_num >actual_data_num*(worst_ratio-1))
 		{
-			actual_redundant_num=actual_data_num*worst_ratio;
+			assert(worst_ratio-1 > 0);
+			actual_redundant_num=actual_data_num*(worst_ratio-1) ;
 		}
 
     	mylog(log_trace,"%d %d %d\n",actual_data_num,actual_redundant_num,fec_len);
