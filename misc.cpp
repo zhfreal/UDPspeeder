@@ -921,12 +921,13 @@ void process_arg(int argc, char *argv[])
 			}
 			else if(strcmp(long_options[option_index].name,"worst-ratio")==0)
 			{
-				sscanf(optarg,"%d",&worst_ratio);
-				if(worst_ratio<1||worst_ratio>10)
+				sscanf(optarg,"%d",&worst_redundant_ratio);
+				if(worst_redundant_ratio<1||worst_redundant_ratio>10)
 				{
 					mylog(log_fatal,"worst_ratio should be between 1 and 10\n");
 					myexit(-1);
 				}
+				worst_redundant_ratio--;
 			}
 			else
 			{
@@ -983,9 +984,9 @@ void process_arg(int argc, char *argv[])
 		}
 	}
 
-	if(g_fec_redundant_num> g_fec_data_num*worst_ratio)
+	if(g_fec_redundant_num> g_fec_data_num * worst_redundant_ratio)
 	{
-		mylog(log_warn,"worst_ratio(%d)  > ( redundant_num(%d)+data_num(%d) )/ data_num  ,maybe there is a mistake.\n",worst_ratio,g_fec_redundant_num,g_fec_data_num);
+		mylog(log_warn,"worst_ratio(%d) -1  <  redundant_num(%d)/ data_num(%d)  ,maybe there is a mistake.\n",worst_redundant_ratio+1,g_fec_redundant_num,g_fec_data_num);
 	}
 
 	print_parameter();

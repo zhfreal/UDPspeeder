@@ -29,7 +29,7 @@ extern int g_fec_mode;
 extern int dynamic_update_fec;
 /*end for first time init or dynamic update*/
 
-extern int worst_ratio;
+extern int worst_redundant_ratio;
 
 struct anti_replay_t
 {

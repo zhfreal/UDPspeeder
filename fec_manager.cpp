@@ -28,7 +28,9 @@ int header_overhead=80;
 
 
 int enable_worst_ratio=1;
-int worst_ratio=3;  // cost 3 times of bandwidth (in total) at worst case
+
+int worst_redundant_ratio=2; //corrsponds to 1:2 or 2:4
+
 
 u32_t fec_buff_num=2000;// how many packet can fec_decode_manager hold. shouldnt be very large,or it will cost huge memory
 
@@ -317,10 +319,10 @@ int fec_encode_manager_t::input(char *s,int len/*,int &is_first_packet*/)
 
     	}
 
-		if(enable_worst_ratio && actual_redundant_num >actual_data_num*(worst_ratio-1))
+
+		if(enable_worst_ratio && actual_redundant_num >actual_data_num*worst_redundant_ratio)
 		{
-			assert(worst_ratio-1 >= 0);
-			actual_redundant_num=actual_data_num*(worst_ratio-1) ;
+			actual_redundant_num=actual_data_num*worst_redundant_ratio ;
 		}
 
     	mylog(log_trace,"%d %d %d\n",actual_data_num,actual_redundant_num,fec_len);
