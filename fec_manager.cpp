@@ -24,7 +24,11 @@ const int encode_fast_send=1;
 const int decode_fast_send=1;
 
 int short_packet_optimize=1;
-int header_overhead=40;
+int header_overhead=80;
+
+
+int enable_worst_ratio=1;
+int worst_ratio=3;  // cost 3 times of bandwidth (in total) at worst case
 
 u32_t fec_buff_num=2000;// how many packet can fec_decode_manager hold. shouldnt be very large,or it will cost huge memory
 
@@ -297,6 +301,7 @@ int fec_encode_manager_t::input(char *s,int len/*,int &is_first_packet*/)
     			mylog(log_trace,"actual_data_num=%d actual_redundant_num=%d\n",best_data_num,fec_redundant_num);
     		}
 
+
         	assert(blob_encode.output(actual_data_num,blob_output,fec_len)==0);
     	}
     	else
@@ -311,6 +316,12 @@ int fec_encode_manager_t::input(char *s,int len/*,int &is_first_packet*/)
     		}
 
     	}
+
+		if(enable_worst_ratio && actual_redundant_num >actual_data_num*worst_ratio)
+		{
+			actual_redundant_num=actual_data_num*worst_ratio;
+		}
+
     	mylog(log_trace,"%d %d %d\n",actual_data_num,actual_redundant_num,fec_len);
 
     	char *tmp_output_buf[max_fec_packet_num+5]={0};

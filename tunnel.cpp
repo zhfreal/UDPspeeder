@@ -202,13 +202,19 @@ int tunnel_client_event_loop()
 					mylog(log_trace,"events[idx].data.u64 == (u64_t)local_listen_fd\n");
 					struct sockaddr_in udp_new_addr_in={0};
 					socklen_t udp_new_addr_len = sizeof(sockaddr_in);
-					if ((data_len = recvfrom(local_listen_fd, data, max_data_len, 0,
+					if ((data_len = recvfrom(local_listen_fd, data, max_data_len+1, 0,
 							(struct sockaddr *) &udp_new_addr_in, &udp_new_addr_len)) == -1) {
 						mylog(log_error,"recv_from error,this shouldnt happen,err=%s,but we can try to continue\n",strerror(errno));
 						continue;
 						//mylog(log_error,"recv_from error,this shouldnt happen at client\n");
 						//myexit(1);
 					};
+
+					if(data_len==max_data_len+1)
+					{
+						mylog(log_warn,"huge packet, data_len > %d,dropped\n",max_data_len);
+						continue;
+					}
 
 					if(!disable_mtu_warn&&data_len>=mtu_warn)
 					{
@@ -273,7 +279,14 @@ int tunnel_client_event_loop()
 				}
 				assert(events[idx].data.u64==remote_fd64);
 				int fd=fd_manager.to_fd(remote_fd64);
-				int data_len =recv(fd,data,max_data_len,0);
+				int data_len =recv(fd,data,max_data_len+1,0);
+
+				if(data_len==max_data_len+1)
+				{
+					mylog(log_warn,"huge packet, data_len > %d,dropped\n",max_data_len);
+					continue;
+				}
+
 				mylog(log_trace, "received data from udp fd %d, len=%d\n", remote_fd,data_len);
 				if(data_len<0)
 				{
@@ -469,12 +482,19 @@ int tunnel_server_event_loop()
 				int data_len;
 				struct sockaddr_in udp_new_addr_in={0};
 				socklen_t udp_new_addr_len = sizeof(sockaddr_in);
-				if ((data_len = recvfrom(local_listen_fd, data, max_data_len, 0,
+				if ((data_len = recvfrom(local_listen_fd, data, max_data_len+1, 0,
 						(struct sockaddr *) &udp_new_addr_in, &udp_new_addr_len)) == -1) {
 					mylog(log_error,"recv_from error,this shouldnt happen,err=%s,but we can try to continue\n",strerror(errno));
 					continue;
 					//myexit(1);
 				};
+
+				if(data_len==max_data_len+1)
+				{
+					mylog(log_warn,"huge packet, data_len > %d,dropped\n",max_data_len);
+					continue;
+				}
+
 				mylog(log_trace,"Received packet from %s:%d,len: %d\n", inet_ntoa(udp_new_addr_in.sin_addr),
 						ntohs(udp_new_addr_in.sin_port),data_len);
 
@@ -662,7 +682,13 @@ int tunnel_server_event_loop()
 					conn_info.update_active_time();
 
 					int fd=fd_manager.to_fd(fd64);
-					data_len=recv(fd,data,max_data_len,0);
+					data_len=recv(fd,data,max_data_len+1,0);
+
+					if(data_len==max_data_len+1)
+					{
+						mylog(log_warn,"huge packet, data_len > %d,dropped\n",max_data_len);
+						continue;
+					}
 
 					mylog(log_trace,"received a packet from udp_fd,len:%d,conv=%d\n",data_len,conv);
 

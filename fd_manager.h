@@ -13,6 +13,7 @@
 
 
 
+
 struct fd_manager_t   //conver fd to a uniq 64bit number,avoid fd value conflict caused by close and re-create
 //this class is not strictly necessary,it just makes epoll fd handling easier
 {

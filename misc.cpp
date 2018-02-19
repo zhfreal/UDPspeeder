@@ -15,6 +15,7 @@ int mtu_warn=1350;
 
 int disable_mtu_warn=1;
 int disable_fec=0;
+int disable_checksum=0;
 
 int debug_force_flush_fec=0;
 
@@ -51,6 +52,8 @@ int keep_reconnect=0;
 int tun_mtu=1500;
 
 int mssfix=1;
+
+
 
 
 int from_normal_to_fec(conn_info_t & conn_info,char *data,int len,int & out_n,char **&out_arr,int *&out_len,my_time_t *&out_delay)
@@ -578,6 +581,8 @@ void process_arg(int argc, char *argv[])
 		{"tun-dev", required_argument,    0, 1},
 		{"tun-mtu", required_argument,    0, 1},
 		{"disable-mssfix", no_argument,    0, 1},
+		{"disable-checksum", no_argument,    0, 1},
+		{"worst-ratio", required_argument,    0, 1},
 		{"keep-reconnect", no_argument,    0, 1},
 		{NULL, 0, 0, 0}
       };
@@ -909,6 +914,20 @@ void process_arg(int argc, char *argv[])
 				mssfix=0;
 				mylog(log_warn,"mssfix disabled\n");
 			}
+			else if(strcmp(long_options[option_index].name,"disable-checksum")==0)
+			{
+				disable_checksum=1;
+				mylog(log_warn,"checksum disabled\n");
+			}
+			else if(strcmp(long_options[option_index].name,"worst-ratio")==0)
+			{
+				sscanf(optarg,"%d",&worst_ratio);
+				if(worst_ratio<1||worst_ratio>10)
+				{
+					mylog(log_fatal,"fec_mtu should be between 1 and 10\n");
+					myexit(-1);
+				}
+			}
 			else
 			{
 				mylog(log_fatal,"unknown option\n");
@@ -962,6 +981,11 @@ void process_arg(int argc, char *argv[])
 			mylog(log_fatal,"error: -l not found\n");
 			myexit(-1);
 		}
+	}
+
+	if(g_fec_redundant_num> g_fec_data_num*worst_ratio)
+	{
+		mylog(log_warn,"worst_ratio(%d)  > redundant_num(%d)+data_num/ data_num(%d)  ,maybe there is a mistake.\n",worst_ratio,g_fec_redundant_num,g_fec_data_num);
 	}
 
 	print_parameter();
