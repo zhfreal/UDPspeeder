@@ -927,7 +927,6 @@ void process_arg(int argc, char *argv[])
 					mylog(log_fatal,"worst_ratio should be between 1 and 10\n");
 					myexit(-1);
 				}
-				worst_redundant_ratio--;
 			}
 			else
 			{
@@ -986,7 +985,7 @@ void process_arg(int argc, char *argv[])
 
 	if(g_fec_redundant_num> g_fec_data_num * worst_redundant_ratio)
 	{
-		mylog(log_warn,"worst_ratio(%d) -1  <  redundant_num(%d)/ data_num(%d)  ,maybe there is a mistake.\n",worst_redundant_ratio+1,g_fec_redundant_num,g_fec_data_num);
+		mylog(log_warn,"worst_ratio(%d)  < redundant_num(%d)/ data_num(%d) ,maybe there is a mistake.\n",worst_redundant_ratio,g_fec_redundant_num,g_fec_data_num);
 	}
 
 	print_parameter();

@@ -24,12 +24,12 @@ const int encode_fast_send=1;
 const int decode_fast_send=1;
 
 int short_packet_optimize=1;
-int header_overhead=80;
+int header_overhead=40;
 
 
 int enable_worst_ratio=1;
 
-int worst_redundant_ratio=2; //corrsponds to 1:2 or 2:4
+int worst_redundant_ratio=4;
 
 
 u32_t fec_buff_num=2000;// how many packet can fec_decode_manager hold. shouldnt be very large,or it will cost huge memory
