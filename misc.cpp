@@ -922,9 +922,9 @@ void process_arg(int argc, char *argv[])
 			else if(strcmp(long_options[option_index].name,"worst-ratio")==0)
 			{
 				sscanf(optarg,"%d",&worst_redundant_ratio);
-				if(worst_redundant_ratio<1||worst_redundant_ratio>10)
+				if(worst_redundant_ratio<0 || worst_redundant_ratio>10)
 				{
-					mylog(log_fatal,"worst_ratio should be between 1 and 10\n");
+					mylog(log_fatal,"worst_ratio should be between 0 and 10\n");
 					myexit(-1);
 				}
 			}
