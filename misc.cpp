@@ -51,7 +51,7 @@ int keep_reconnect=0;
 
 int tun_mtu=1500;
 
-int mssfix=1;
+int mssfix=0;
 
 
 
@@ -580,7 +580,8 @@ void process_arg(int argc, char *argv[])
 		{"sub-net", required_argument,    0, 1},
 		{"tun-dev", required_argument,    0, 1},
 		{"tun-mtu", required_argument,    0, 1},
-		{"disable-mssfix", no_argument,    0, 1},
+//		{"disable-mssfix", no_argument,    0, 1},
+		{"mssfix", required_argument,    0, 1},
 		{"disable-checksum", no_argument,    0, 1},
 		{"worst-ratio", required_argument,    0, 1},
 		{"keep-reconnect", no_argument,    0, 1},
@@ -909,10 +910,10 @@ void process_arg(int argc, char *argv[])
 				sscanf(optarg,"%d",&tun_mtu);
 				mylog(log_warn,"changed tun_mtu,tun_mtu=%d\n",tun_mtu);
 			}
-			else if(strcmp(long_options[option_index].name,"disable-mssfix")==0)
+			else if(strcmp(long_options[option_index].name,"mssfix")==0)
 			{
-				mssfix=0;
-				mylog(log_warn,"mssfix disabled\n");
+				sscanf(optarg,"%d",&mssfix);
+				mylog(log_warn,"mssfix=%d\n",mssfix);
 			}
 			else if(strcmp(long_options[option_index].name,"disable-checksum")==0)
 			{
