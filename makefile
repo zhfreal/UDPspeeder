@@ -78,7 +78,7 @@ release: ${TARGETS}
 
 clean:	
 	rm -f ${TAR}
-	rm -f speeder speeder_cross
+	rm -f speederv2 speederv2_cross
 	rm -f git_version.h
 
 git_version:

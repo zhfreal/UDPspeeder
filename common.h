@@ -52,9 +52,10 @@ typedef int socklen_t;
 #include<map>
 #include<list>
 #include<string>
+#include<vector>
 
 using  namespace std;
-
+using std::vector;
 
 typedef unsigned long long u64_t;   //this works on most platform,avoid using the PRId64
 typedef long long i64_t;
@@ -151,6 +152,8 @@ extern raw_mode_t raw_mode;
 enum program_mode_t {unset_mode=0,client_mode,server_mode};
 extern program_mode_t client_or_server;
 extern unordered_map<int, const char*> raw_mode_tostring ;
+
+vector<string> parse_conf_line(const string& s);
 
 enum working_mode_t {unset_working_mode=0,tunnel_mode,tun_dev_mode};
 extern working_mode_t working_mode;

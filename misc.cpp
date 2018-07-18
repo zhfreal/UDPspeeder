@@ -7,7 +7,7 @@
 
 
 #include "misc.h"
-
+#include <fstream>
 
 char fifo_file[1000]="";
 
@@ -590,6 +590,31 @@ int unit_test()
 	return 0;
 }
 
+int load_config(char *file_name, int &argc, vector<string> &argv) //load conf file and append to argv
+{
+    // Load configurations from config_file instead of the command line.
+    // See config.example for example configurations
+    std::ifstream conf_file(file_name);
+    std::string line;
+    if(conf_file.fail())
+    {
+        mylog(log_fatal,"conf_file %s open failed,reason :%s\n",file_name,strerror(errno));
+        myexit(-1);
+    }
+    while(std::getline(conf_file,line))
+    {
+        auto res=parse_conf_line(line);
+
+        argc+=res.size();
+        for(int i=0;i<(int)res.size();i++)
+        {
+            argv.push_back(res[i]);
+        }
+    }
+    conf_file.close();
+
+    return 0;
+}
 
 void process_arg(int argc, char *argv[])
 {
@@ -1019,6 +1044,66 @@ void process_arg(int argc, char *argv[])
 	}
 
 	print_parameter();
+
+}
+
+void parse_arg(int argc, char **argv)//mainly for load conf file
+{
+	int i;
+	int new_argc=0;
+	vector<string> new_argv;
+
+	int count=0;
+	int pos=-1;
+
+	for (i = 0; i < argc; i++)
+	{
+		if(strcmp(argv[i],"--conf-file")==0)
+		{
+			count++;
+			pos=i;
+			if(i==argc)
+			{
+				mylog(log_fatal,"--conf-file need a parameter\n");
+				myexit(-1);
+			}
+			if(argv[i+1][0]=='-')
+			{
+				mylog(log_fatal,"--conf-file need a parameter\n");
+				myexit(-1);
+			}
+			i++;
+		}
+		else
+		{
+			//printf("<%s>",argv[i]);
+			new_argc++;
+			new_argv.push_back(argv[i]);
+		}
+	}
+	if(count>1)
+	{
+		mylog(log_fatal,"duplicated --conf-file option\n");
+		myexit(-1);
+	}
+
+	if(count>0)
+	{
+		load_config(argv[pos+1],new_argc,new_argv);
+	}
+	char* new_argv_char[new_argv.size()];
+
+	new_argc=0;
+	for(i=0;i<(int)new_argv.size();i++)
+	{
+		if(strcmp(new_argv[i].c_str(),"--conf-file")==0)
+		{
+			mylog(log_fatal,"cant have --conf-file in a config file\n");
+			myexit(-1);
+		}
+		new_argv_char[new_argc++]=(char *)new_argv[i].c_str();
+	}
+	process_arg(new_argc,new_argv_char);
 
 }
 

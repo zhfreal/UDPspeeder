@@ -2,7 +2,7 @@
  * comm.cpp
  *
  *  Created on: Jul 29, 2017
- *      Author: wangyu
+ *	  Author: wangyu
  */
 
 #include "common.h"
@@ -40,20 +40,20 @@ int init_ws()
 	err = WSAStartup(wVersionRequested, &wsaData);
 	if (err != 0) {
 		/* Tell the user that we could not find a usable */
-		/* Winsock DLL.                                  */
+		/* Winsock DLL.								  */
 		printf("WSAStartup failed with error: %d\n", err);
 		exit(-1);
 	}
 
 	/* Confirm that the WinSock DLL supports 2.2.*/
-	/* Note that if the DLL supports versions greater    */
+	/* Note that if the DLL supports versions greater	*/
 	/* than 2.2 in addition to 2.2, it will still return */
-	/* 2.2 in wVersion since that is the version we      */
-	/* requested.                                        */
+	/* 2.2 in wVersion since that is the version we	  */
+	/* requested.										*/
 
 	if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
 		/* Tell the user that we could not find a usable */
-		/* WinSock DLL.                                  */
+		/* WinSock DLL.								  */
 		printf("Could not find a usable version of Winsock.dll\n");
 		WSACleanup();
 		exit(-1);
@@ -111,32 +111,32 @@ int get_sock_errno()
 
 struct my_random_t
 {
-    std::random_device rd;
-    std::mt19937 gen;
-    std::uniform_int_distribution<u64_t> dis64;
-    std::uniform_int_distribution<u32_t> dis32;
+	std::random_device rd;
+	std::mt19937 gen;
+	std::uniform_int_distribution<u64_t> dis64;
+	std::uniform_int_distribution<u32_t> dis32;
 
-    std::uniform_int_distribution<unsigned char> dis8;
+	std::uniform_int_distribution<unsigned char> dis8;
 
-    my_random_t()
+	my_random_t()
 	{
-    	std::mt19937 gen_tmp(rd());
-    	gen=gen_tmp;
-    	gen.discard(700000);  //magic
+		std::mt19937 gen_tmp(rd());
+		gen=gen_tmp;
+		gen.discard(700000);  //magic
 	}
-    u64_t gen64()
-    {
-    	return dis64(gen);
-    }
-    u32_t gen32()
-    {
-    	return dis32(gen);
-    }
+	u64_t gen64()
+	{
+		return dis64(gen);
+	}
+	u32_t gen32()
+	{
+		return dis32(gen);
+	}
 
-    unsigned char gen8()
-    {
-    	return dis8(gen);
-    }
+	unsigned char gen8()
+	{
+		return dis8(gen);
+	}
 	/*int random_number_fd;
 	random_fd_t()
 	{
@@ -387,13 +387,13 @@ void setnonblocking(int sock) {
 	opts = fcntl(sock, F_GETFL);
 
 	if (opts < 0) {
-    	mylog(log_fatal,"fcntl(sock,GETFL)\n");
+		mylog(log_fatal,"fcntl(sock,GETFL)\n");
 		//perror("fcntl(sock,GETFL)");
 		myexit(1);
 	}
 	opts = opts | O_NONBLOCK;
 	if (fcntl(sock, F_SETFL, opts) < 0) {
-    	mylog(log_fatal,"fcntl(sock,SETFL,opts)\n");
+		mylog(log_fatal,"fcntl(sock,SETFL,opts)\n");
 		//perror("fcntl(sock,SETFL,opts)");
 		myexit(1);
 	}
@@ -408,39 +408,39 @@ void setnonblocking(int sock) {
 }
 
 /*
-    Generic checksum calculation function
+	Generic checksum calculation function
 */
 unsigned short csum(const unsigned short *ptr,int nbytes) {
-    long sum;
-    unsigned short oddbyte;
-    short answer;
+	long sum;
+	unsigned short oddbyte;
+	short answer;
 
-    sum=0;
-    while(nbytes>1) {
-        sum+=*ptr++;
-        nbytes-=2;
-    }
-    if(nbytes==1) {
-        oddbyte=0;
-        *((u_char*)&oddbyte)=*(u_char*)ptr;
-        sum+=oddbyte;
-    }
+	sum=0;
+	while(nbytes>1) {
+		sum+=*ptr++;
+		nbytes-=2;
+	}
+	if(nbytes==1) {
+		oddbyte=0;
+		*((u_char*)&oddbyte)=*(u_char*)ptr;
+		sum+=oddbyte;
+	}
 
-    sum = (sum>>16)+(sum & 0xffff);
-    sum = sum + (sum>>16);
-    answer=(short)~sum;
+	sum = (sum>>16)+(sum & 0xffff);
+	sum = sum + (sum>>16);
+	answer=(short)~sum;
 
-    return(answer);
+	return(answer);
 }
 
 
 unsigned short tcp_csum(const pseudo_header & ph,const unsigned short *ptr,int nbytes) {//works both for big and little endian
 
-    long sum;
-    unsigned short oddbyte;
-    short answer;
+	long sum;
+	unsigned short oddbyte;
+	short answer;
 
-    sum=0;
+	sum=0;
 	unsigned short * tmp= (unsigned short *)&ph;
 	for(int i=0;i<6;i++)
 	{
@@ -448,21 +448,21 @@ unsigned short tcp_csum(const pseudo_header & ph,const unsigned short *ptr,int n
 	}
 
 
-    while(nbytes>1) {
-        sum+=*ptr++;
-        nbytes-=2;
-    }
-    if(nbytes==1) {
-        oddbyte=0;
-        *((u_char*)&oddbyte)=*(u_char*)ptr;
-        sum+=oddbyte;
-    }
+	while(nbytes>1) {
+		sum+=*ptr++;
+		nbytes-=2;
+	}
+	if(nbytes==1) {
+		oddbyte=0;
+		*((u_char*)&oddbyte)=*(u_char*)ptr;
+		sum+=oddbyte;
+	}
 
-    sum = (sum>>16)+(sum & 0xffff);
-    sum = sum + (sum>>16);
-    answer=(short)~sum;
+	sum = (sum>>16)+(sum & 0xffff);
+	sum = sum + (sum>>16);
+	answer=(short)~sum;
 
-    return(answer);
+	return(answer);
 }
 
 int set_buf_size(int fd,int socket_buf_size,int force_socket_buf)
@@ -500,7 +500,7 @@ int set_buf_size(int fd,int socket_buf_size,int force_socket_buf)
 
 void myexit(int a)
 {
-    if(enable_log_color)
+	if(enable_log_color)
    	 printf("%s\n",RESET);
    // clear_iptables_rule();
 	exit(a);
@@ -508,7 +508,7 @@ void myexit(int a)
 void  signal_handler(int sig)
 {
 	about_to_exit=1;
-    // myexit(0);
+	// myexit(0);
 }
 /*
 int numbers_to_char(id_t id1,id_t id2,id_t id3,char * &data,int &len)
@@ -746,9 +746,9 @@ int new_listen_socket(int &fd,u32_t ip,int port)
 		myexit(1);
 	}
 	setnonblocking(fd);
-    set_buf_size(fd,socket_buf_size);
+	set_buf_size(fd,socket_buf_size);
 
-    mylog(log_debug,"local_listen_fd=%d\n",fd);
+	mylog(log_debug,"local_listen_fd=%d\n",fd);
 
 	return 0;
 }
@@ -782,4 +782,59 @@ int new_connected_socket(int &fd,u32_t ip,int port)
 	}
 	return 0;
 }
+vector<string> parse_conf_line(const string& s0)
+{
+	string s=s0;
+	s.reserve(s.length()+200);
+	char *buf=(char *)s.c_str();
+	//char buf[s.length()+200];
+	char *p=buf;
+	int i=int(s.length())-1;
+	int j;
+	vector<string>res;
+	strcpy(buf,(char *)s.c_str());
+	while(i>=0)
+	{
+		if(buf[i]==' ' || buf[i]== '\t')
+			buf[i]=0;
+		else break;
+		i--;
+	}
+	while(*p!=0)
+	{
+		if(*p==' ' || *p== '\t')
+		{
+			p++;
+		}
+		else break;
+	}
+	int new_len=strlen(p);
+	if(new_len==0)return res;
+	if(p[0]=='#') return res;
+	if(p[0]!='-')
+	{
+		mylog(log_fatal,"line :<%s> not begin with '-' ",s.c_str());
+		myexit(-1);
+	}
 
+	for(i=0;i<new_len;i++)
+	{
+		if(p[i]==' '||p[i]=='\t')
+		{
+			break;
+		}
+	}
+	if(i==new_len)
+	{
+		res.push_back(p);
+		return res;
+	}
+
+	j=i;
+	while(p[j]==' '||p[j]=='\t')
+		j++;
+	p[i]=0;
+	res.push_back(p);
+	res.push_back(p+j);
+	return res;
+}
