@@ -1,0 +1,22 @@
+#  This file is part of speederv2.
+#
+
+
+[Unit]
+Description=%i
+Documentation=speederv2
+After=network.target
+
+[Service]
+Type=simple
+PermissionsStartOnly=true
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ExecStart=/usr/local/bin/speederv2 --conf-file /etc/speederv2/%i.conf
+Restart=on-failure
+User=nobody
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=%i
+
+[Install]
+WantedBy=multi-user.target
