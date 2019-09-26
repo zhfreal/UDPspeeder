@@ -9,6 +9,7 @@
 #include "common.h"
 #include "log.h"
 #include "packet.h"
+#include "misc.h"
 
 int iv_min=4;
 int iv_max=32;//< 256;
@@ -146,7 +147,7 @@ int de_obscure_old(const char * input, int in_len,char *output,int &out_len)
 	return 0;
 }
 
-
+/*
 int sendto_fd_ip_port (int fd,u32_t ip,int port,char * buf, int len,int flags)
 {
 
@@ -161,6 +162,15 @@ int sendto_fd_ip_port (int fd,u32_t ip,int port,char * buf, int len,int flags)
 			len , 0,
 			(struct sockaddr *) &tmp_sockaddr,
 			sizeof(tmp_sockaddr));
+}*/
+
+int sendto_fd_addr (int fd,address_t addr,char * buf, int len,int flags)
+{
+
+	return sendto(fd, buf,
+			len , 0,
+			(struct sockaddr *) &addr.inner,
+			addr.get_len());
 }
 /*
 int sendto_ip_port (u32_t ip,int port,char * buf, int len,int flags)
@@ -181,17 +191,17 @@ int my_send(const dest_t &dest,char *data,int len)
 	}
 	switch(dest.type)
 	{
-		case type_fd_ip_port:
+		case type_fd_addr:
 		{
-			return sendto_fd_ip_port(dest.inner.fd,dest.inner.fd_ip_port.ip_port.ip,dest.inner.fd_ip_port.ip_port.port,data,len,0);
+			return sendto_fd_addr(dest.inner.fd,dest.inner.fd_addr.addr,data,len,0);
 			break;
 		}
-		case type_fd64_ip_port:
+		case type_fd64_addr:
 		{
 			if(!fd_manager.exist(dest.inner.fd64)) return -1;
 			int fd=fd_manager.to_fd(dest.inner.fd64);
 
-			return sendto_fd_ip_port(fd,dest.inner.fd64_ip_port.ip_port.ip,dest.inner.fd64_ip_port.ip_port.port,data,len,0);
+			return sendto_fd_addr(fd,dest.inner.fd64_addr.addr,data,len,0);
 			break;
 		}
 		case type_fd:
@@ -315,6 +325,7 @@ int get_conv0(u32_t &conv,const char *input,int len_in,char *&output,int &len_ou
 }
 int put_crc32(char * s,int &len)
 {
+	if(disable_checksum)return 0;
 	assert(len>=0);
 	//if(len<0) return -1;
 	u32_t crc32=crc32h((unsigned char *)s,len);
@@ -355,8 +366,8 @@ int de_cook(char * s,int &len)
 }
 int rm_crc32(char * s,int &len)
 {
+	if(disable_checksum)return 0;
 	assert(len>=0);
-
 	len-=sizeof(u32_t);
 	if(len<0) return -1;
 	u32_t crc32_in=read_u32(s+len);

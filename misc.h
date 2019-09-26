@@ -22,6 +22,7 @@ extern int mtu_warn;
 
 extern int disable_mtu_warn;
 extern int disable_fec;
+extern int disable_checksum;
 
 extern int debug_force_flush_fec;
 
@@ -34,9 +35,11 @@ extern int output_interval_max;
 
 extern int fix_latency;
 
-extern u32_t local_ip_uint32,remote_ip_uint32;
-extern char local_ip[100], remote_ip[100];
-extern int local_port, remote_port;
+//extern u32_t local_ip_uint32,remote_ip_uint32;
+//extern char local_ip[100], remote_ip[100];
+//extern int local_port, remote_port;
+
+extern address_t local_addr,remote_addr;
 
 extern conn_manager_t conn_manager;
 extern delay_manager_t delay_manager;
@@ -52,6 +55,9 @@ extern int tun_mtu;
 
 extern int mssfix;
 
+extern int manual_set_tun;
+extern int persist_tun;
+
 
 int from_normal_to_fec(conn_info_t & conn_info,char *data,int len,int & out_n,char **&out_arr,int *&out_len,my_time_t *&out_delay);
 int from_fec_to_normal(conn_info_t & conn_info,char *data,int len,int & out_n,char **&out_arr,int *&out_len,my_time_t *&out_delay);
@@ -63,8 +69,8 @@ int handle_command(char *s);
 int unit_test();
 
 //void print_help();
-
 void parse_arg(int argc, char *argv[]);//mainly for load conf file;
+//void process_arg(int argc, char *argv[]);
 
 extern char sub_net[100];
 extern u32_t sub_net_uint32;

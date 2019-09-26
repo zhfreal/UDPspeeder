@@ -53,9 +53,8 @@ typedef int socklen_t;
 #include<list>
 #include<string>
 #include<vector>
-
 using  namespace std;
-using std::vector;
+
 
 typedef unsigned long long u64_t;   //this works on most platform,avoid using the PRId64
 typedef long long i64_t;
@@ -66,7 +65,10 @@ typedef int i32_t;
 typedef unsigned short u16_t;
 typedef short i16_t;
 
+
 #if defined(__MINGW32__)
+int inet_pton(int af, const char *src, void *dst);
+const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #define setsockopt(a,b,c,d,e) setsockopt(a,b,c,(const char *)(d),e)
 #endif
 
@@ -97,10 +99,11 @@ struct my_itimerspec {
 
 typedef u64_t my_time_t;
 
-
+const int max_addr_len=100;
 const int max_data_len=3600;
 const int buf_len=max_data_len+200;
 
+const int default_mtu=1250;
 
 //const u32_t timer_interval=400;
 ////const u32_t conv_timeout=180000;
@@ -150,10 +153,8 @@ extern int about_to_exit;
 enum raw_mode_t{mode_faketcp=0,mode_udp,mode_icmp,mode_end};
 extern raw_mode_t raw_mode;
 enum program_mode_t {unset_mode=0,client_mode,server_mode};
-extern program_mode_t client_or_server;
+extern program_mode_t program_mode;
 extern unordered_map<int, const char*> raw_mode_tostring ;
-
-vector<string> parse_conf_line(const string& s);
 
 enum working_mode_t {unset_working_mode=0,tunnel_mode,tun_dev_mode};
 extern working_mode_t working_mode;
@@ -172,8 +173,9 @@ typedef u64_t anti_replay_seq_t;
 typedef u64_t fd64_t;
 
 //enum dest_type{none=0,type_fd64_ip_port,type_fd64,type_fd64_ip_port_conv,type_fd64_conv/*,type_fd*/};
-enum dest_type{none=0,type_fd64_ip_port,type_fd64,type_fd,type_write_fd,type_fd_ip_port/*,type_fd*/};
+enum dest_type{none=0,type_fd64_addr,type_fd64,type_fd,type_write_fd,type_fd_addr/*,type_fd*/};
 
+/*
 struct ip_port_t
 {
 	u32_t ip;
@@ -192,13 +194,182 @@ struct fd_ip_port_t
 {
 	int fd;
 	ip_port_t ip_port;
+};*/
+
+
+struct pseudo_header {
+    u32_t source_address;
+    u32_t dest_address;
+    unsigned char placeholder;
+    unsigned char protocol;
+    unsigned short tcp_length;
+};
+
+u32_t djb2(unsigned char *str,int len);
+u32_t sdbm(unsigned char *str,int len);
+
+struct address_t  //TODO scope id
+{
+	struct hash_function
+	{
+	    u32_t operator()(const address_t &key) const
+		{
+	    	return sdbm((unsigned char*)&key.inner,sizeof(key.inner));
+		}
+	};
+
+	union storage_t //sockaddr_storage is too huge, we dont use it.
+	{
+		sockaddr_in ipv4;
+		sockaddr_in6 ipv6;
+	};
+	storage_t inner;
+
+	/*address_t()
+	{
+		clear();
+	}*/
+	void clear()
+	{
+		memset(&inner,0,sizeof(inner));
+	}
+	/*
+	int from_ip_port(u32_t  ip, int port)
+	{
+		clear();
+		inner.ipv4.sin_family=AF_INET;
+		inner.ipv4.sin_port=htons(port);
+		inner.ipv4.sin_addr.s_addr=ip;
+		return 0;
+	}*/
+
+	int from_ip_port_new(int type, void *  ip, int port)
+	{
+		clear();
+		if(type==AF_INET)
+		{
+			inner.ipv4.sin_family=AF_INET;
+			inner.ipv4.sin_port=htons(port);
+			inner.ipv4.sin_addr.s_addr=*((u32_t *)ip);
+		}
+		else if(type==AF_INET6)
+		{
+			inner.ipv6.sin6_family=AF_INET6;
+			inner.ipv6.sin6_port=htons(port);
+			inner.ipv6.sin6_addr=*((in6_addr*)ip);
+		}
+		return 0;
+	}
+
+	int from_str(char * str);
+
+	int from_str_ip_only(char * str);
+
+	int from_sockaddr(sockaddr *,socklen_t);
+
+	char* get_str();
+	void to_str(char *);
+
+	inline int is_vaild()
+	{
+		u32_t ret=((sockaddr*)&inner)->sa_family;
+		return (ret==AF_INET||ret==AF_INET6);
+	}
+
+	inline u32_t get_type()
+	{
+		assert(is_vaild());
+		u32_t ret=((sockaddr*)&inner)->sa_family;
+		return ret;
+	}
+
+	inline u32_t get_len()
+	{
+		u32_t type=get_type();
+		switch(type)
+		{
+			case AF_INET:
+				return sizeof(sockaddr_in);
+			case AF_INET6:
+				return sizeof(sockaddr_in6);
+			default:
+				assert(0==1);
+		}
+		return -1;
+	}
+
+	inline u32_t get_port()
+	{
+		u32_t type=get_type();
+		switch(type)
+		{
+			case AF_INET:
+				return ntohs(inner.ipv4.sin_port);
+			case AF_INET6:
+				return ntohs(inner.ipv6.sin6_port);
+			default:
+				assert(0==1);
+		}
+		return -1;
+	}
+
+	inline void set_port(int port)
+	{
+		u32_t type=get_type();
+		switch(type)
+		{
+			case AF_INET:
+				inner.ipv4.sin_port=htons(port);
+				break;
+			case AF_INET6:
+				inner.ipv6.sin6_port=htons(port);
+				break;
+			default:
+				assert(0==1);
+		}
+		return ;
+	}
+
+    bool operator == (const address_t &b) const
+    {
+    	//return this->data==b.data;
+        return memcmp(&this->inner,&b.inner,sizeof(this->inner))==0;
+    }
+
+    int new_connected_udp_fd();
+
+    char* get_ip();
+};
+
+namespace std {
+template <>
+ struct hash<address_t>
+ {
+   std::size_t operator()(const address_t& key) const
+   {
+
+	 //return address_t::hash_function(k);
+	   return sdbm((unsigned char*)&key.inner,sizeof(key.inner));
+   }
+ };
+}
+
+struct fd64_addr_t
+{
+	fd64_t fd64;
+	address_t addr;
+};
+struct fd_addr_t
+{
+	int fd;
+	address_t addr;
 };
 union inner_t
 {
 	fd64_t fd64;
 	int fd;
-	fd64_ip_port_t fd64_ip_port;
-	fd_ip_port_t fd_ip_port;
+	fd64_addr_t fd64_addr;
+	fd_addr_t fd_addr;
 };
 struct dest_t
 {
@@ -210,16 +381,8 @@ struct dest_t
 
 struct fd_info_t
 {
-	ip_port_t ip_port;
+	address_t addr;
 	ev_io io_watcher;
-};
-
-struct pseudo_header {
-    u32_t source_address;
-    u32_t dest_address;
-    unsigned char placeholder;
-    unsigned char protocol;
-    unsigned short tcp_length;
 };
 
 u64_t get_current_time();
@@ -252,7 +415,7 @@ u64_t hton64(u64_t a);
 bool larger_than_u16(uint16_t a,uint16_t b);
 bool larger_than_u32(u32_t a,u32_t b);
 void setnonblocking(int sock);
-int set_buf_size(int fd,int socket_buf_size,int force_socket_buf=0);
+int set_buf_size(int fd,int socket_buf_size);
 
 unsigned short csum(const unsigned short *ptr,int nbytes);
 unsigned short tcp_csum(const pseudo_header & ph,const unsigned short *ptr,int nbytes);
@@ -281,5 +444,116 @@ int create_new_udp(int &new_udp_fd,int remote_address_uint32,int remote_port);
 int new_listen_socket(int &fd,u32_t ip,int port);
 
 int new_connected_socket(int &fd,u32_t ip,int port);
+
+int new_listen_socket2(int &fd,address_t &addr);
+int new_connected_socket2(int &fd,address_t &addr);
+
+struct not_copy_able_t
+{
+	not_copy_able_t()
+	{
+
+	}
+	not_copy_able_t(const not_copy_able_t &other)
+	{
+		assert(0==1);
+	}
+	const not_copy_able_t & operator=(const not_copy_able_t &other)
+	{
+		assert(0==1);
+		return other;
+	}
+};
+
+
+template <class key_t>
+struct lru_collector_t:not_copy_able_t
+{
+	//typedef void* key_t;
+//#define key_t void*
+	struct lru_pair_t
+	{
+		key_t key;
+		my_time_t ts;
+	};
+
+	unordered_map<key_t,typename list<lru_pair_t>::iterator> mp;
+
+	list<lru_pair_t> q;
+	int update(key_t key)
+	{
+		assert(mp.find(key)!=mp.end());
+		auto it=mp[key];
+		q.erase(it);
+
+		my_time_t value=get_current_time();
+		if(!q.empty())
+		{
+			assert(value >=q.front().ts);
+		}
+		lru_pair_t tmp; tmp.key=key; tmp.ts=value;
+		q.push_front( tmp);
+		mp[key]=q.begin();
+
+		return 0;
+	}
+	int new_key(key_t key)
+	{
+		assert(mp.find(key)==mp.end());
+
+		my_time_t value=get_current_time();
+		if(!q.empty())
+		{
+			assert(value >=q.front().ts);
+		}
+		lru_pair_t tmp; tmp.key=key; tmp.ts=value;
+		q.push_front( tmp);
+		mp[key]=q.begin();
+
+		return 0;
+	}
+	int size()
+	{
+		return q.size();
+	}
+	int empty()
+	{
+		return q.empty();
+	}
+	void clear()
+	{
+		mp.clear(); q.clear();
+	}
+	my_time_t ts_of(key_t key)
+	{
+		assert(mp.find(key)!=mp.end());
+		return mp[key]->ts;
+	}
+
+	my_time_t peek_back(key_t &key)
+	{
+		assert(!q.empty());
+		auto it=q.end(); it--;
+		key=it->key;
+		return it->ts;
+	}
+	void erase(key_t key)
+	{
+		assert(mp.find(key)!=mp.end());
+		q.erase(mp[key]);
+		mp.erase(key);
+	}
+	/*
+	void erase_back()
+	{
+		assert(!q.empty());
+		auto it=q.end(); it--;
+		key_t key=it->key;
+		erase(key);
+	}*/
+};
+
+
+vector<string> string_to_vec(const char * s,const char * sp) ;
 
 #endif /* COMMON_H_ */

@@ -18,16 +18,183 @@ const u32_t anti_replay_buff_size=30000;//can be set very large
 const int max_fec_packet_num=255;// this is the limitation of the rs lib
 extern u32_t fec_buff_num;
 
+const int rs_str_len=max_fec_packet_num*10+100;
+extern int header_overhead;
+extern int debug_fec_enc;
+extern int debug_fec_dec;
 
-/*begin for first time init or dynamic update*/
-extern int g_fec_data_num;
-extern int g_fec_redundant_num;
-extern int g_fec_mtu;
-extern int g_fec_queue_len;
-extern int g_fec_timeout; //8ms
-extern int g_fec_mode;
-extern int dynamic_update_fec;
-/*end for first time init or dynamic update*/
+struct fec_parameter_t
+{
+	int version=0;
+	int mtu=default_mtu;
+	int queue_len=200;
+	int timeout=8*1000;
+	int mode=0;
+
+	int rs_cnt=0;
+	struct rs_parameter_t //parameters for reed solomon
+	{
+		unsigned char x;//AKA fec_data_num  (x should be same as <index of rs_par>+1 at the moment)
+		unsigned char y;//fec_redundant_num
+	}rs_par[max_fec_packet_num+10];
+
+	int rs_from_str(char * s)//todo inefficient
+	{
+		vector<string> str_vec=string_to_vec(s,",");
+		if(str_vec.size()<1)
+		{
+			mylog(log_warn,"failed to parse [%s]\n",s);
+			return -1;
+		}
+		vector<rs_parameter_t> par_vec;
+		for(int i=0;i<(int)str_vec.size();i++)
+		{
+			rs_parameter_t tmp_par;
+			string &tmp_str=str_vec[i];
+			int x,y;
+			if(sscanf((char *)tmp_str.c_str(),"%d:%d",&x,&y)!=2)
+			{
+				mylog(log_warn,"failed to parse [%s]\n",tmp_str.c_str());
+				return -1;
+			}
+			if(x<1||y<0||x+y>max_fec_packet_num)
+			{
+				mylog(log_warn,"invaild value x=%d y=%d, x should >=1, y should >=0, x +y should <%d\n",x,y,max_fec_packet_num);
+				return -1;
+			}
+			tmp_par.x=x;
+			tmp_par.y=y;
+			par_vec.push_back(tmp_par);
+		}
+		assert(par_vec.size()==str_vec.size());
+
+		int found_problem=0;
+		for(int i=1;i<(int)par_vec.size();i++)
+		{
+			if(par_vec[i].x<=par_vec[i-1].x)
+			{
+				mylog(log_warn,"error in [%s], x in x:y should be in ascend order\n",s);
+				return -1;
+			}
+			int now_x=par_vec[i].x;
+			int now_y=par_vec[i].y;
+			int pre_x=par_vec[i-1].x;
+			int pre_y=par_vec[i-1].y;
+
+			double now_ratio=double(par_vec[i].y)/par_vec[i].x;
+			double pre_ratio=double(par_vec[i-1].y)/par_vec[i-1].x;
+
+			if(pre_ratio+0.0001<now_ratio)
+			{
+				if(found_problem==0)
+				{
+					mylog(log_warn,"possible problems: %d/%d<%d/%d",pre_y,pre_x,now_y,now_x);
+					found_problem=1;
+				}
+				else
+				{
+					log_bare(log_warn,", %d/%d<%d/%d",pre_y,pre_x,now_y,now_x);
+				}
+			}
+		}
+		if(found_problem)
+		{
+			log_bare(log_warn," in %s\n",s);
+		}
+
+		{ //special treatment for first parameter
+			int x=par_vec[0].x;
+			int y=par_vec[0].y;
+			for(int i=1;i<=x;i++)
+			{
+				rs_par[i-1].x=i;
+				rs_par[i-1].y=y;
+			}
+		}
+
+		for(int i=1;i<(int)par_vec.size();i++)
+		{
+			int now_x=par_vec[i].x;
+			int now_y=par_vec[i].y;
+			int pre_x=par_vec[i-1].x;
+			int pre_y=par_vec[i-1].y;
+			rs_par[now_x-1].x=now_x;
+			rs_par[now_x-1].y=now_y;
+
+			double now_ratio=double(par_vec[i].y)/par_vec[i].x;
+			double pre_ratio=double(par_vec[i-1].y)/par_vec[i-1].x;
+
+			//double k= double(now_y-pre_y)/double(now_x-pre_x);
+			for(int j=pre_x+1;j<=now_x-1;j++)
+			{
+				int in_x=j;
+
+			////////	int in_y= double(pre_y) + double(in_x-pre_x)*k+ 0.9999;// round to upper
+
+			double distance=now_x-pre_x;
+			///////	double in_ratio=pre_ratio*(1.0-(in_x-pre_x)/distance)   +   now_ratio *(1.0- (now_x-in_x)/distance);
+			//////	int in_y= in_x*in_ratio + 0.9999;
+				int in_y= pre_y +(now_y-pre_y) *(in_x-pre_x)/distance +0.9999;
+
+				if(in_x+in_y>max_fec_packet_num)
+				{
+					in_y=max_fec_packet_num-in_x;
+					assert(in_y>=0&&in_y<=max_fec_packet_num);
+				}
+
+				rs_par[in_x-1].x=in_x;
+				rs_par[in_x-1].y=in_y;
+			}
+		}
+		rs_cnt=par_vec[par_vec.size()-1].x;
+
+		return 0;
+	}
+
+	char *rs_to_str()//todo inefficient
+	{
+		static char res[rs_str_len];
+		string tmp_string;
+		char tmp_buf[100];
+		assert(rs_cnt>=1);
+		for(int i=0;i<rs_cnt;i++)
+		{
+			sprintf(tmp_buf,"%d:%d",int(rs_par[i].x),int(rs_par[i].y));
+			if(i!=0)
+				tmp_string+=",";
+			tmp_string+=tmp_buf;
+		}
+		strcpy(res,tmp_string.c_str());
+		return res;
+	}
+
+	rs_parameter_t get_tail()
+	{
+		assert(rs_cnt>=1);
+		return rs_par[rs_cnt-1];
+	}
+
+
+	int clone(fec_parameter_t & other)
+	{
+		version=other.version;
+		mtu=other.mtu;
+		queue_len=other.queue_len;
+		timeout=other.timeout;
+		mode=other.mode;
+
+		assert(other.rs_cnt>=1);
+		rs_cnt=other.rs_cnt;
+		memcpy(rs_par,other.rs_par,sizeof(rs_parameter_t)*rs_cnt);
+
+		return 0;
+	}
+
+
+};
+
+extern fec_parameter_t g_fec_par;
+//extern int dynamic_update_fec;
 
 const int anti_replay_timeout=60*1000;// 60s
 
@@ -128,17 +295,19 @@ struct blob_decode_t
 	int output(int &n,char ** &output,int *&len_arr);
 };
 
-class fec_encode_manager_t
+class fec_encode_manager_t:not_copy_able_t
 {
 
 private:
 	u32_t seq;
 
-	int fec_mode;
-	int fec_data_num,fec_redundant_num;
-	int fec_mtu;
-	int fec_queue_len;
-	int fec_timeout;
+	//int fec_mode;
+	//int fec_data_num,fec_redundant_num;
+	//int fec_mtu;
+	//int fec_queue_len;
+	//int fec_timeout;
+	fec_parameter_t fec_par;
+
 
 	my_time_t first_packet_time;
 	my_time_t first_packet_time_for_output;
@@ -168,6 +337,10 @@ public:
 	fec_encode_manager_t();
 	~fec_encode_manager_t();
 
+	fec_parameter_t & get_fec_par()
+	{
+		return fec_par;
+	}
 	void set_data(void * data)
 	{
 		timer.data=data;
@@ -221,12 +394,12 @@ public:
 
 	int get_pending_time()
 	{
-		return fec_timeout;
+		return fec_par.timeout;
 	}
 
 	int get_type()
 	{
-		return fec_mode;
+		return fec_par.mode;
 	}
 	//u64_t get_timer_fd64();
 	int reset_fec_parameter(int data_num,int redundant_num,int mtu,int pending_num,int pending_time,int type);
@@ -253,10 +426,10 @@ struct fec_group_t
 	//int data_counter=0;
 	map<int,int>  group_mp;
 };
-class fec_decode_manager_t
+class fec_decode_manager_t:not_copy_able_t
 {
 	anti_replay_t anti_replay;
-	fec_data_t *fec_data;
+	fec_data_t *fec_data=0;
 	unordered_map<u32_t, fec_group_t> mp;
 	blob_decode_t blob_decode;
 
@@ -274,15 +447,22 @@ public:
 	fec_decode_manager_t()
 	{
 		fec_data=new fec_data_t[fec_buff_num+5];
+		assert(fec_data!=0);
 		clear();
 	}
+	/*
 	fec_decode_manager_t(const fec_decode_manager_t &b)
 	{
 		assert(0==1);//not allowed to copy
-	}
+	}*/
 	~fec_decode_manager_t()
 	{
-		delete fec_data;
+		mylog(log_debug,"fec_decode_manager destroyed\n");
+		if(fec_data!=0)
+		{
+			mylog(log_debug,"fec_data freed\n");
+			delete fec_data;
+		}
 	}
 	int clear()
 	{

@@ -7,7 +7,7 @@ void data_from_local_or_fec_timeout(conn_info_t & conn_info,int is_time_out)
 
 	char data[buf_len];
 	int data_len;
-	ip_port_t ip_port;
+	address_t addr;
 	u32_t conv;
 	int  out_n;char **out_arr;int *out_len;my_time_t *out_delay;
 	dest_t dest;
@@ -42,8 +42,8 @@ void data_from_local_or_fec_timeout(conn_info_t & conn_info,int is_time_out)
 	else//events[idx].data.u64 == (u64_t)local_listen_fd
 	{
 		mylog(log_trace,"events[idx].data.u64 == (u64_t)local_listen_fd\n");
-		struct sockaddr_in udp_new_addr_in={0};
-		socklen_t udp_new_addr_len = sizeof(sockaddr_in);
+		address_t::storage_t udp_new_addr_in={0};
+		socklen_t udp_new_addr_len = sizeof(address_t::storage_t);
 		if ((data_len = recvfrom(local_listen_fd, data, max_data_len, 0,
 				(struct sockaddr *) &udp_new_addr_in, &udp_new_addr_len)) == -1) {
 			mylog(log_debug,"recv_from error,this shouldnt happen,err=%s,but we can try to continue\n",get_sock_error());
@@ -54,31 +54,31 @@ void data_from_local_or_fec_timeout(conn_info_t & conn_info,int is_time_out)
 		{
 			mylog(log_warn,"huge packet,data len=%d (>=%d).strongly suggested to set a smaller mtu at upper level,to get rid of this warn\n ",data_len,mtu_warn);
 		}
-		mylog(log_trace,"Received packet from %s:%d,len: %d\n", inet_ntoa(udp_new_addr_in.sin_addr),
-				ntohs(udp_new_addr_in.sin_port),data_len);
 
-		ip_port.ip=udp_new_addr_in.sin_addr.s_addr;
-		ip_port.port=ntohs(udp_new_addr_in.sin_port);
 
-		u64_t u64=ip_port.to_u64();
+		addr.from_sockaddr((struct sockaddr *) &udp_new_addr_in,udp_new_addr_len);
 
-		if(!conn_info.conv_manager.is_u64_used(u64))
+		mylog(log_trace,"Received packet from %s, len: %d\n", addr.get_str(),data_len);
+
+		//u64_t u64=ip_port.to_u64();
+
+		if(!conn_info.conv_manager.c.is_data_used(addr))
 		{
-			if(conn_info.conv_manager.get_size() >=max_conv_num)
+			if(conn_info.conv_manager.c.get_size() >=max_conv_num)
 			{
 				mylog(log_warn,"ignored new udp connect bc max_conv_num exceed\n");
 				return;
 			}
-			conv=conn_info.conv_manager.get_new_conv();
-			conn_info.conv_manager.insert_conv(conv,u64);
-			mylog(log_info,"new packet from %s:%d,conv_id=%x\n",inet_ntoa(udp_new_addr_in.sin_addr),ntohs(udp_new_addr_in.sin_port),conv);
+			conv=conn_info.conv_manager.c.get_new_conv();
+			conn_info.conv_manager.c.insert_conv(conv,addr);
+			mylog(log_info,"new packet from %s,conv_id=%x\n",addr.get_str(),conv);
 		}
 		else
 		{
-			conv=conn_info.conv_manager.find_conv_by_u64(u64);
+			conv=conn_info.conv_manager.c.find_conv_by_data(addr);
 			mylog(log_trace,"conv=%d\n",conv);
 		}
-		conn_info.conv_manager.update_active_time(conv);
+		conn_info.conv_manager.c.update_active_time(conv);
 		char * new_data;
 		int new_len;
 		put_conv(conv,data,data_len,new_data,new_len);
@@ -160,19 +160,19 @@ static void remote_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 			mylog(log_debug,"get_conv(conv,out_arr[i],out_len[i],new_data,new_len)!=0");
 			continue;
 		}
-		if(!conn_info.conv_manager.is_conv_used(conv))
+		if(!conn_info.conv_manager.c.is_conv_used(conv))
 		{
 			mylog(log_trace,"!conn_info.conv_manager.is_conv_used(conv)");
 			continue;
 		}
 
-		conn_info.conv_manager.update_active_time(conv);
+		conn_info.conv_manager.c.update_active_time(conv);
 
-		u64_t u64=conn_info.conv_manager.find_u64_by_conv(conv);
+		address_t addr=conn_info.conv_manager.c.find_data_by_conv(conv);
 		dest_t dest;
-		dest.inner.fd_ip_port.fd=conn_info.local_listen_fd;
-		dest.inner.fd_ip_port.ip_port.from_u64(u64);
-		dest.type=type_fd_ip_port;
+		dest.inner.fd_addr.fd=conn_info.local_listen_fd;
+		dest.inner.fd_addr.addr=addr;
+		dest.type=type_fd_addr;
 
 		delay_send(out_delay[i],dest,new_data,new_len);
 	}
@@ -224,7 +224,7 @@ static void conn_timer_cb(struct ev_loop *loop, struct ev_timer *watcher, int re
 	conn_info_t & conn_info= *((conn_info_t*)watcher->data);
 
 	//read(conn_info.timer.get_timer_fd(), &value, 8);
-	conn_info.conv_manager.clear_inactive();
+	conn_info.conv_manager.c.clear_inactive();
 	mylog(log_trace,"events[idx].data.u64==(u64_t)conn_info.timer.get_timer_fd()\n");
 
 	conn_info.stat.report_as_client();
@@ -262,7 +262,7 @@ int tunnel_client_event_loop()
     conn_info_t &conn_info=*conn_info_p;  //huge size of conn_info,do not allocate on stack
 
 	int &local_listen_fd=conn_info.local_listen_fd;
-    new_listen_socket(local_listen_fd,local_ip_uint32,local_port);
+    new_listen_socket2(local_listen_fd,local_addr);
 
 	//epoll_fd = epoll_create1(0);
 	//assert(epoll_fd>0);
@@ -295,7 +295,7 @@ int tunnel_client_event_loop()
     int & remote_fd=conn_info.remote_fd;
     fd64_t &remote_fd64=conn_info.remote_fd64;
 
-	assert(new_connected_socket(remote_fd,remote_ip_uint32,remote_port)==0);
+	assert(new_connected_socket2(remote_fd,remote_addr)==0);
 	remote_fd64=fd_manager.create(remote_fd);
 
 	mylog(log_debug,"remote_fd64=%llu\n",remote_fd64);
@@ -381,6 +381,7 @@ int tunnel_client_event_loop()
 	ev_init(&prepare_watcher,prepare_cb);
 	ev_prepare_start(loop,&prepare_watcher);
 
+	mylog(log_info,"now listening at %s\n",local_addr.get_str());
 
 	ev_run(loop, 0);
 

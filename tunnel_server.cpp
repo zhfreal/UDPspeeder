@@ -29,17 +29,17 @@ void data_from_remote_or_fec_timeout_or_conn_timer(conn_info_t & conn_info,fd64_
 
 
 	//conn_info_t &conn_info=conn_manager.find(ip_port);
-	ip_port_t &ip_port=conn_info.ip_port;
-	assert(conn_manager.exist(ip_port));
+	address_t &addr=conn_info.addr;
+	assert(conn_manager.exist(addr));
 
 	int &local_listen_fd=conn_info.local_listen_fd;
 
 	int  out_n=-2;char **out_arr;int *out_len;my_time_t *out_delay;
 
 	dest_t dest;
-	dest.inner.fd_ip_port.fd=local_listen_fd;
-	dest.inner.fd_ip_port.ip_port=ip_port;
-	dest.type=type_fd_ip_port;
+	dest.inner.fd_addr.fd=local_listen_fd;
+	dest.inner.fd_addr.addr=addr;
+	dest.type=type_fd_addr;
 	dest.cook=1;
 
 	if(mode==is_fec_timeout)
@@ -64,13 +64,13 @@ void data_from_remote_or_fec_timeout_or_conn_timer(conn_info_t & conn_info,fd64_
 		assert(fd64==0);
 		//uint64_t value;
 		//read(conn_info.timer.get_timer_fd(), &value, 8);
-		conn_info.conv_manager.clear_inactive();
+		conn_info.conv_manager.s.clear_inactive();
 		if(debug_force_flush_fec)
 		{
 		from_normal_to_fec(conn_info,0,0,out_n,out_arr,out_len,out_delay);
 		}
 
-		conn_info.stat.report_as_server(ip_port);
+		conn_info.stat.report_as_server(addr);
 		return;
 	}
 	else if(mode==is_from_remote)
@@ -82,10 +82,10 @@ void data_from_remote_or_fec_timeout_or_conn_timer(conn_info_t & conn_info,fd64_
 		}
 
 		//fd64_t &fd64 =conn_info.remote_fd64;
-		assert(conn_info.conv_manager.is_u64_used(fd64));
+		assert(conn_info.conv_manager.s.is_data_used(fd64));
 
-		conv=conn_info.conv_manager.find_conv_by_u64(fd64);
-		conn_info.conv_manager.update_active_time(conv);
+		conv=conn_info.conv_manager.s.find_conv_by_data(fd64);
+		conn_info.conv_manager.s.update_active_time(conv);
 		conn_info.update_active_time();
 
 		int fd=fd_manager.to_fd(fd64);
@@ -133,15 +133,18 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 	mylog(log_trace,"events[idx].data.u64 == (u64_t)local_listen_fd\n");
 	char data[buf_len];
 	int data_len;
-	struct sockaddr_in udp_new_addr_in={0};
-	socklen_t udp_new_addr_len = sizeof(sockaddr_in);
+	address_t::storage_t udp_new_addr_in={0};
+	socklen_t udp_new_addr_len = sizeof(address_t::storage_t);
 	if ((data_len = recvfrom(local_listen_fd, data, max_data_len, 0,
 			(struct sockaddr *) &udp_new_addr_in, &udp_new_addr_len)) == -1) {
 		mylog(log_error,"recv_from error,this shouldnt happen,err=%s,but we can try to continue\n",get_sock_error());
 		return;
 	};
-	mylog(log_trace,"Received packet from %s:%d,len: %d\n", inet_ntoa(udp_new_addr_in.sin_addr),
-			ntohs(udp_new_addr_in.sin_port),data_len);
+
+	address_t addr;
+	addr.from_sockaddr((struct sockaddr *) &udp_new_addr_in,udp_new_addr_len);
+
+	mylog(log_trace,"Received packet from %s,len: %d\n", addr.get_str(),data_len);
 
 	if(!disable_mtu_warn&&data_len>=mtu_warn)///////////////////////delete this for type 0 in furture
 	{
@@ -156,21 +159,18 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 	}
 
 
-	ip_port_t ip_port;
-	ip_port.ip=udp_new_addr_in.sin_addr.s_addr;
-	ip_port.port=ntohs(udp_new_addr_in.sin_port);
-	mylog(log_trace,"ip_port= %s\n",ip_port.to_s());
-	if(!conn_manager.exist(ip_port))
+
+	if(!conn_manager.exist(addr))
 	{
 		if(conn_manager.mp.size() >=max_conn_num)
 		{
-			mylog(log_warn,"new connection %s ignored bc max_conn_num exceed\n",ip_port.to_s());
+			mylog(log_warn,"new connection %s ignored bc max_conn_num exceed\n",addr.get_str());
 			return;
 		}
 
-		conn_manager.insert(ip_port);
-		conn_info_t &conn_info=conn_manager.find(ip_port);
-		conn_info.ip_port=ip_port;
+		//conn_manager.insert(addr);
+		conn_info_t &conn_info=conn_manager.find_insert(addr);
+		conn_info.addr=addr;
 		conn_info.loop=ev_default_loop(0);
 		conn_info.local_listen_fd=local_listen_fd;
 
@@ -201,10 +201,10 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 	    conn_info.fec_encode_manager.set_loop_and_cb(loop,fec_encode_cb);
 
 
-		mylog(log_info,"new connection from %s\n",ip_port.to_s());
+		mylog(log_info,"new connection from %s\n",addr.get_str());
 
 	}
-	conn_info_t &conn_info=conn_manager.find(ip_port);
+	conn_info_t &conn_info=conn_manager.find_insert(addr);
 
 	conn_info.update_active_time();
 	int  out_n;char **out_arr;int *out_len;my_time_t *out_delay;
@@ -223,19 +223,19 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 		}
 
 
-		if (!conn_info.conv_manager.is_conv_used(conv))
+		if (!conn_info.conv_manager.s.is_conv_used(conv))
 		{
-			if(conn_info.conv_manager.get_size() >=max_conv_num)
+			if(conn_info.conv_manager.s.get_size() >=max_conv_num)
 			{
 				mylog(log_warn,"ignored new udp connect bc max_conv_num exceed\n");
 				continue;
 			}
 
 			int new_udp_fd;
-			ret=new_connected_socket(new_udp_fd,remote_ip_uint32,remote_port);
+			ret=new_connected_socket2(new_udp_fd,remote_addr);
 
 			if (ret != 0) {
-				mylog(log_warn, "[%s]new_connected_socket failed\n",ip_port.to_s());
+				mylog(log_warn, "[%s]new_connected_socket failed\n",addr.get_str());
 				continue;
 			}
 
@@ -244,8 +244,8 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 			//ev.data.u64 = fd64;
 			//ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, new_udp_fd, &ev);
 
-			conn_info.conv_manager.insert_conv(conv, fd64);
-			fd_manager.get_info(fd64).ip_port=ip_port;
+			conn_info.conv_manager.s.insert_conv(conv, fd64);
+			fd_manager.get_info(fd64).addr=addr;
 
 			ev_io &io_watcher=fd_manager.get_info(fd64).io_watcher;
 			io_watcher.u64=fd64;
@@ -256,10 +256,10 @@ static void local_listen_cb(struct ev_loop *loop, struct ev_io *watcher, int rev
 			ev_io_start(conn_info.loop,&io_watcher);
 
 
-			mylog(log_info,"[%s]new conv %x,fd %d created,fd64=%llu\n",ip_port.to_s(),conv,new_udp_fd,fd64);
+			mylog(log_info,"[%s]new conv %x,fd %d created,fd64=%llu\n",addr.get_str(),conv,new_udp_fd,fd64);
 		}
-		conn_info.conv_manager.update_active_time(conv);
-		fd64_t fd64= conn_info.conv_manager.find_u64_by_conv(conv);
+		conn_info.conv_manager.s.update_active_time(conv);
+		fd64_t fd64= conn_info.conv_manager.s.find_data_by_conv(conv);
 		dest_t dest;
 		dest.type=type_fd64;
 		dest.inner.fd64=fd64;
@@ -350,7 +350,7 @@ int tunnel_server_event_loop()
 	//int remote_fd;
 
 	int local_listen_fd;
-    new_listen_socket(local_listen_fd,local_ip_uint32,local_port);
+    new_listen_socket2(local_listen_fd,local_addr);
 
 	//epoll_fd = epoll_create1(0);
 	//assert(epoll_fd>0);
@@ -388,7 +388,7 @@ int tunnel_server_event_loop()
 
 	//mylog(log_debug," delay_manager.get_timer_fd() =%d\n", delay_manager.get_timer_fd());
 
-	mylog(log_info,"now listening at %s:%d\n",my_ntoa(local_ip_uint32),local_port);
+	mylog(log_info,"now listening at %s\n",local_addr.get_str());
 
 	//my_timer_t timer;
 	//timer.add_fd_to_epoll(epoll_fd);
