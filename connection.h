@@ -23,6 +23,8 @@ const int disable_conv_clear=0;
 
 void server_clear_function(u64_t u64);
 
+vector<string> parse_conf_line(const string& s);
+
 template  <class T>
 struct conv_manager_t  // manage the udp connections
 {

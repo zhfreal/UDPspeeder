@@ -74,7 +74,8 @@ int unit_test();
 
 //void print_help();
 
-void process_arg(int argc, char *argv[]);
+//void process_arg(int argc, char *argv[]);
+void parse_arg(int argc, char *argv[]);//mainly for load conf file;
 
 extern char sub_net[100];
 extern u32_t sub_net_uint32;

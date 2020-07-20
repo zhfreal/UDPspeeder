@@ -37,6 +37,8 @@ static void print_help()
 	printf("    --report              <number>        turn on send/recv report, and set a period for reporting, unit: s\n");
 
 	printf("advanced options:\n");
+    printf("    --conf-file           <string>        read options from a configuration file instead of command line.\n");
+    printf("                                          check example_server.conf and example_client.conf in repo for format\n");
 	printf("    --mode                <number>        fec-mode,available values: 0,1; mode 0(default) costs less bandwidth,no mtu problem.\n");
 	printf("                                          mode 1 usually introduces less latency, but you have to care about mtu.\n");
 	printf("    --mtu                 <number>        mtu. for mode 0, the program will split packet to segment smaller than mtu value.\n");
@@ -146,7 +148,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	process_arg(argc,argv);
+	// process_arg(argc,argv);
+    parse_arg(argc, argv);
 
 	delay_manager.set_capacity(delay_capacity);
 
